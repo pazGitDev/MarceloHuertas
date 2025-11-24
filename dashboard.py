@@ -1,4 +1,4 @@
-﻿import streamlit as st
+import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 # ============================================
 # CONFIGURACIÓN DE SUPABASE
 # ============================================
-SUPABASE_URL = "https://lacbutfifzqiihmpflgo.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxhY2J1dGZpZnpxaWlobXBmbGdvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4MTAzMzMsImV4cCI6MjA3ODM4NjMzM30.paiHJmwKPNY6oJlp487e3kD2-1JeVJ3kxxpxi3IRY-Q"
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # Crear cliente de Supabase
 @st.cache_resource
@@ -208,10 +208,10 @@ if not df.empty:
     st.markdown("### ☀️ Evolución de la Luminosidad")
     fig_light = px.area(
         df,
-        x='created_at',
+        x='read_at',
         y='light',
         title='',
-        labels={'created_at': 'Fecha y Hora', 'light': 'Luminosidad (lux)'}
+        labels={'read_at': 'Fecha y Hora', 'light': 'Luminosidad (lux)'}
     )
     fig_light.update_layout(height=400)
     st.plotly_chart(fig_light, use_container_width=True)
@@ -254,8 +254,8 @@ if not df.empty:
     # ============================================
     with st.expander("📋 Ver Datos Recientes (últimos 20 registros)"):
         df_display = df.tail(20).copy()
-        df_display['created_at'] = df_display['created_at'].dt.strftime('%d/%m/%Y %H:%M:%S')
-        df_display = df_display[['created_at', 'ph', 'humidity', 'light']]
+        df_display['read_at'] = df_display['read_at'].dt.strftime('%d/%m/%Y %H:%M:%S')
+        df_display = df_display[['read_at', 'ph', 'humidity', 'light']]
         df_display.columns = ['Fecha y Hora', 'pH', 'Humedad (%)', 'Luz (lux)']
         st.dataframe(df_display, use_container_width=True, hide_index=True)
 
