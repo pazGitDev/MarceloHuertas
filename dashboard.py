@@ -79,6 +79,37 @@ with st.sidebar:
         format_func=lambda x: f"Últimas {x} horas"
     )
     
+    st.markdown("---")
+    
+    # Configuración de rangos óptimos
+    st.subheader("🎯 Rangos Óptimos")
+    
+    # Rangos de pH
+    st.markdown("**🧪 pH**")
+    col1, col2 = st.columns(2)
+    with col1:
+        ph_min = st.number_input("Mínimo", min_value=0.0, max_value=14.0, value=6.0, step=0.1, key="ph_min")
+    with col2:
+        ph_max = st.number_input("Máximo", min_value=0.0, max_value=14.0, value=7.5, step=0.1, key="ph_max")
+    
+    # Rangos de Humedad
+    st.markdown("**💧 Humedad (%)**")
+    col3, col4 = st.columns(2)
+    with col3:
+        humidity_min = st.number_input("Mínimo", min_value=0, max_value=100, value=60, step=5, key="hum_min")
+    with col4:
+        humidity_max = st.number_input("Máximo", min_value=0, max_value=100, value=100, step=5, key="hum_max")
+    
+    # Rangos de Luz
+    st.markdown("**☀️ Luz (lux)**")
+    col5, col6 = st.columns(2)
+    with col5:
+        light_min = st.number_input("Mínimo", min_value=0, max_value=100000, value=1000, step=100, key="light_min")
+    with col6:
+        light_max = st.number_input("Máximo", min_value=0, max_value=100000, value=10000, step=100, key="light_max")
+    
+    st.markdown("---")
+    
     # Botón de actualización
     if st.button("🔄 Actualizar Datos", use_container_width=True):
         st.cache_data.clear()
@@ -97,6 +128,10 @@ with st.sidebar:
 df = fetch_data(time_range)
 latest = get_latest_reading()
 
+# Filtrar valores -1 y null de pH en todo el DataFrame
+if not df.empty:
+    df.loc[(df['ph'] == -1) | (df['ph'].isna()), 'ph'] = None
+
 # ============================================
 # MÉTRICAS ACTUALES
 # ============================================
@@ -107,16 +142,16 @@ if latest:
     
     with col1:
         ph_value = latest['ph']
-        if ph_value is not None:
+        if ph_value is not None and ph_value != -1:
             st.metric(
                 label="🧪 pH",
                 value=f"{ph_value:.2f}",
                 delta=None
             )
-            # Indicador de estado del pH
-            if 6.0 <= ph_value <= 7.5:
+            # Indicador de estado del pH usando rangos configurados
+            if ph_min <= ph_value <= ph_max:
                 st.success("✅ pH óptimo")
-            elif 5.5 <= ph_value < 6.0 or 7.5 < ph_value <= 8.0:
+            elif (ph_min - 0.5) <= ph_value < ph_min or ph_max < ph_value <= (ph_max + 0.5):
                 st.warning("⚠️ pH aceptable")
             else:
                 st.error("❌ pH fuera de rango")
@@ -131,10 +166,10 @@ if latest:
             value=f"{humidity}%",
             delta=None
         )
-        # Indicador de humedad
-        if humidity >= 60:
+        # Indicador de humedad usando rangos configurados
+        if humidity_min <= humidity <= humidity_max:
             st.success("✅ Humedad óptima")
-        elif 30 <= humidity < 60:
+        elif (humidity_min - 10) <= humidity < humidity_min:
             st.warning("⚠️ Considera regar")
         else:
             st.error("❌ Riego necesario")
@@ -146,13 +181,13 @@ if latest:
             value=f"{light:.0f} lux",
             delta=None
         )
-        # Indicador de luz
-        if light > 10000:
-            st.success("☀️ Luz solar directa")
-        elif light > 1000:
-            st.info("⛅ Luz indirecta")
+        # Indicador de luz usando rangos configurados
+        if light_min <= light <= light_max:
+            st.success("✅ Luz óptima")
+        elif light > light_max:
+            st.warning("☀️ Luz muy intensa")
         else:
-            st.warning("🌙 Poca luz")
+            st.info("🌙 Poca luz")
 
     st.caption(f"Última lectura: {pd.to_datetime(latest['read_at']).strftime('%d/%m/%Y %H:%M:%S')}")
 
@@ -169,7 +204,8 @@ if not df.empty:
     
     # Gráfico de pH
     st.markdown("### 🧪 Evolución del pH")
-    df_ph = df[df['ph'].notna()].copy()
+    # Filtrar valores válidos de pH (excluir null y -1)
+    df_ph = df[(df['ph'].notna()) & (df['ph'] != -1)].copy()
     
     if not df_ph.empty:
         fig_ph = px.line(
@@ -179,9 +215,10 @@ if not df.empty:
             title='',
             labels={'read_at': 'Fecha y Hora', 'ph': 'pH'}
         )
-        fig_ph.add_hline(y=7.0, line_dash="dash", line_color="green", 
+        fig_ph.add_hline(y=7.0, line_dash="dash", line_color="gray", 
                          annotation_text="pH Neutro (7.0)")
-        fig_ph.add_hrect(y0=6.0, y1=7.5, fillcolor="green", opacity=0.1,
+        # Usar rangos configurados por el usuario
+        fig_ph.add_hrect(y0=ph_min, y1=ph_max, fillcolor="green", opacity=0.1,
                          annotation_text="Rango óptimo", annotation_position="top left")
         fig_ph.update_layout(height=400)
         st.plotly_chart(fig_ph, use_container_width=True)
@@ -198,8 +235,9 @@ if not df.empty:
         labels={'read_at': 'Fecha y Hora', 'humidity': 'Humedad (%)'}
     )
     fig_humidity.add_hline(y=30, line_dash="dash", line_color="red",
-                           annotation_text="Mínimo (30%)")
-    fig_humidity.add_hrect(y0=60, y1=100, fillcolor="green", opacity=0.1,
+                           annotation_text="Crítico (30%)")
+    # Usar rangos configurados por el usuario
+    fig_humidity.add_hrect(y0=humidity_min, y1=humidity_max, fillcolor="green", opacity=0.1,
                           annotation_text="Rango óptimo", annotation_position="top left")
     fig_humidity.update_layout(height=400)
     st.plotly_chart(fig_humidity, use_container_width=True)
@@ -213,6 +251,9 @@ if not df.empty:
         title='',
         labels={'read_at': 'Fecha y Hora', 'light': 'Luminosidad (lux)'}
     )
+    # Usar rangos configurados por el usuario
+    fig_light.add_hrect(y0=light_min, y1=light_max, fillcolor="green", opacity=0.1,
+                       annotation_text="Rango óptimo", annotation_position="top left")
     fig_light.update_layout(height=400)
     st.plotly_chart(fig_light, use_container_width=True)
     
@@ -227,7 +268,8 @@ if not df.empty:
     
     with col1:
         st.markdown("**🧪 pH**")
-        df_ph_stats = df[df['ph'].notna()]
+        # Filtrar valores válidos para estadísticas
+        df_ph_stats = df[(df['ph'].notna()) & (df['ph'] != -1)]
         if not df_ph_stats.empty:
             st.metric("Promedio", f"{df_ph_stats['ph'].mean():.2f}")
             st.metric("Mínimo", f"{df_ph_stats['ph'].min():.2f}")
@@ -255,6 +297,8 @@ if not df.empty:
     with st.expander("📋 Ver Datos Recientes (últimos 20 registros)"):
         df_display = df.tail(20).copy()
         df_display['read_at'] = df_display['read_at'].dt.strftime('%d/%m/%Y %H:%M:%S')
+        # Reemplazar None con "--" para mejor visualización
+        df_display['ph'] = df_display['ph'].apply(lambda x: "--" if pd.isna(x) else f"{x:.2f}")
         df_display = df_display[['read_at', 'ph', 'humidity', 'light']]
         df_display.columns = ['Fecha y Hora', 'pH', 'Humedad (%)', 'Luz (lux)']
         st.dataframe(df_display, use_container_width=True, hide_index=True)
